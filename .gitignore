@@ -1,0 +1,11 @@
+target
+.project
+.classpath
+.settings
+.idea
+*.iml
+*.chain
+*.spvchain
+*.wallet
+test.lock.db
+*.spv
