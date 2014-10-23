@@ -4,8 +4,9 @@ import java.io.File
 import java.math.BigInteger
 
 import org.bitcoinj.core._
-import org.bitcoinj.kits.WalletAppKit
+import org.bitcoinj.net.discovery.DnsDiscovery
 import org.bitcoinj.params.{MainNetParams, RegTestParams, TestNet3Params}
+import org.bitcoinj.store.SPVBlockStore
 
 
 object Main extends App{
@@ -35,13 +36,33 @@ object Main extends App{
     // Parse the address given as the first parameter.
     val privateKey = addressToKey(params, args(0))
 
-    val kit = new WalletAppKit(params, new File("."), filePrefix)
-    if (params eq RegTestParams.get) {
-      kit.connectToLocalHost
+    val chainStore: SPVBlockStore = new SPVBlockStore(params, new File(filePrefix + ".spvchain"))
+    val chain: BlockChain = new BlockChain(params, chainStore)
+
+    val wallet = new Wallet(params)
+    wallet.importKey(privateKey)
+
+    val peers: PeerGroup = new PeerGroup(params, chain)
+    peers.addPeerDiscovery(new DnsDiscovery(params))
+
+    chain.addWallet(wallet)
+    peers.addWallet(wallet)
+
+    val blockChainListener: DownloadListener = new DownloadListener {
+      override def doneDownload {
+        Console.println("blockchain downloaded")
+      }
     }
-    // Download the block chain and wait until it's done.
-    kit.startAsync
-    kit.awaitRunning
+
+    peers.startAsync
+    peers.awaitRunning
+    peers.startBlockChainDownload(blockChainListener)
+    blockChainListener.await
+
+    Console.println(wallet.toString)
+
+    peers.stopAsync
+    peers.awaitTerminated
 
   }
 
