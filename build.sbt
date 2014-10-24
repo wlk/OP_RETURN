@@ -2,11 +2,11 @@ import AssemblyKeys._
 
 assemblySettings
 
-name := "blockchain-writer"
+name := "blockchain-message"
 
 version := "1.0"
 
-jarName in assembly := "blockchain-writer.jar"
+jarName in assembly := "blockchain-message.jar"
 
 test in assembly := {}
 
