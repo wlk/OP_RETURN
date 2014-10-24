@@ -42,13 +42,17 @@ object Main extends App{
     val chain: BlockChain = new BlockChain(params, chainStore)
 
     val wallet = new Wallet(params)
+    wallet.allowSpendingUnconfirmedTransactions()
+
     wallet.importKey(privateKey)
 
     val peers: PeerGroup = new PeerGroup(params, chain)
     peers.addPeerDiscovery(new DnsDiscovery(params))
+    peers.setUseLocalhostPeerWhenPossible(false)
 
     chain.addWallet(wallet)
     peers.addWallet(wallet)
+    peers.setBloomFilterFalsePositiveRate(0.0) //decreases privacy, but it's just a example
 
     peers.startAsync
     peers.awaitRunning()
@@ -60,13 +64,15 @@ object Main extends App{
     //val messagePrice = Coin.parseCoin("0.001")
     //val messagePrice = Transaction.MIN_NONDUST_OUTPUT
     val messagePrice = Coin.ZERO
-    val script = new ScriptBuilder().op(ScriptOpCodes.OP_RETURN).data("hello".getBytes).build()
+    val script = new ScriptBuilder().op(ScriptOpCodes.OP_RETURN).data("hello world!".getBytes).build()
 
-    tx.addOutput(messagePrice, script) //0 BTC goes to
-    tx.addOutput(wallet.getBalance, new Address(params, "mx6EmoJHfEuNZFnhKcd2fBML3ri9PscP2M"))
+    tx.addOutput(messagePrice, script) //0 BTC goes to nowhere
 
+    //tx.addOutput(wallet.getBalance.subtract(Coin.SATOSHI.multiply(1000)), privateKey.toAddress(params)) //the rest goes back to me (excluding fee)
 
+//mx6EmoJHfEuNZFnhKcd2fBML3ri9PscP2M
     val request: Wallet.SendRequest  = Wallet.SendRequest.forTx(tx)
+    request.changeAddress = privateKey.toAddress(params)
     wallet.completeTx(request)
     Console.println("inputs: " + tx.getInputs)
     Console.println("outputs: " + tx.getOutputs)
