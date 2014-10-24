@@ -6,7 +6,8 @@ import java.math.BigInteger
 import org.bitcoinj.core._
 import org.bitcoinj.net.discovery.DnsDiscovery
 import org.bitcoinj.params.{MainNetParams, RegTestParams, TestNet3Params}
-import org.bitcoinj.store.SPVBlockStore
+import org.bitcoinj.script.{ScriptOpCodes, ScriptBuilder}
+import org.bitcoinj.store.{MemoryBlockStore, SPVBlockStore}
 
 
 object Main extends App{
@@ -36,7 +37,8 @@ object Main extends App{
     // Parse the address given as the first parameter.
     val privateKey = addressToKey(params, args(0))
 
-    val chainStore: SPVBlockStore = new SPVBlockStore(params, new File(filePrefix + ".spvchain"))
+    //val chainStore: SPVBlockStore = new SPVBlockStore(params, new File(filePrefix + ".spvchain"))
+    val chainStore: MemoryBlockStore = new MemoryBlockStore(params)
     val chain: BlockChain = new BlockChain(params, chainStore)
 
     val wallet = new Wallet(params)
@@ -48,22 +50,38 @@ object Main extends App{
     chain.addWallet(wallet)
     peers.addWallet(wallet)
 
-    val blockChainListener: DownloadListener = new DownloadListener {
-      override def doneDownload {
-        Console.println("blockchain downloaded")
-      }
-    }
-
     peers.startAsync
-    peers.awaitRunning
-    peers.startBlockChainDownload(blockChainListener)
-    blockChainListener.await
+    peers.awaitRunning()
+    peers.downloadBlockChain()
 
     Console.println(wallet.toString)
 
-    peers.stopAsync
-    peers.awaitTerminated
+    val tx: Transaction = new Transaction(params)
+    //val messagePrice = Coin.parseCoin("0.001")
+    //val messagePrice = Transaction.MIN_NONDUST_OUTPUT
+    val messagePrice = Coin.ZERO
+    val script = new ScriptBuilder().op(ScriptOpCodes.OP_RETURN).data("hello".getBytes).build()
 
+    tx.addOutput(messagePrice, script) //0 BTC goes to
+    tx.addOutput(wallet.getBalance, new Address(params, "mx6EmoJHfEuNZFnhKcd2fBML3ri9PscP2M"))
+
+
+    val request: Wallet.SendRequest  = Wallet.SendRequest.forTx(tx)
+    wallet.completeTx(request)
+    Console.println("inputs: " + tx.getInputs)
+    Console.println("outputs: " + tx.getOutputs)
+    //wallet.commitTx(request.tx)
+
+    peers.broadcastTransaction(request.tx).get()
+
+    wallet.addEventListener(new AbstractWalletEventListener {
+      override def onCoinsSent(w: Wallet, tx: Transaction, prevBalance: Coin, newBalance: Coin): Unit ={
+        Console.println("transaction: " + tx)
+      }
+    })
+
+    peers.stopAsync
+    peers.awaitTerminated()
   }
 
   def addressToKey(params: NetworkParameters, sourceAddress: String): ECKey = {

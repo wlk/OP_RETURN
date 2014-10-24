@@ -9,3 +9,4 @@ target
 *.wallet
 test.lock.db
 *.spv
+*.out
